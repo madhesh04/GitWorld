@@ -15,22 +15,26 @@ const ZONES = [
   { icon: "🌀", label: "REBASE" },
 ];
 
+import { signInWithGitHub } from '@/lib/firebase/auth';
+
 export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
   const router = useRouter();
 
-  const handleLogin = () => {
+  const handleLogin = async () => {
     setLoading(true);
     setError(false);
-    setTimeout(() => {
-      if (Math.random() > 0.95) {
-        setError(true);
-        setLoading(false);
-      } else {
-        router.push('/world');
-      }
-    }, 1200);
+    try {
+      await signInWithGitHub();
+      // Set a simple session cookie for the middleware
+      document.cookie = "session=true; path=/; max-age=36000"; 
+      router.push('/world');
+    } catch (err: any) {
+      console.error("Login failed:", err);
+      setError(true);
+      setLoading(false);
+    }
   };
 
   return (

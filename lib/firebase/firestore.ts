@@ -13,20 +13,35 @@ import { db } from './config'
 import { UserDocument } from '@/types/user'
 import { ProgressDocument } from '@/types/progress'
 
-export async function getUser(uid: string): Promise<UserDocument | null> {
-  const snap = await getDoc(doc(db, 'users', uid))
-  return snap.exists() ? (snap.data() as UserDocument) : null
-}
-
-export async function createUser(
-  uid: string,
-  data: Partial<UserDocument>
-): Promise<void> {
-  await setDoc(doc(db, 'users', uid), {
-    ...data,
-    createdAt: serverTimestamp(),
-    lastActiveAt: serverTimestamp(),
-  })
+export async function getOrCreateUser(uid: string, initialData: Partial<UserDocument>): Promise<UserDocument> {
+  const userRef = doc(db, 'users', uid)
+  const snap = await getDoc(userRef)
+  
+  if (snap.exists()) {
+    return snap.data() as UserDocument
+  } else {
+    const newUser: UserDocument = {
+      uid,
+      displayName: initialData.displayName || 'Octocat',
+      email: initialData.email || '',
+      avatarUrl: initialData.avatarUrl || '',
+      githubUsername: initialData.githubUsername || '',
+      avatarIndex: 0,
+      xp: 0,
+      level: 1,
+      streakDays: 0,
+      streakLastDate: '',
+      longestStreak: 0,
+      completedLessons: [],
+      completedZones: [],
+      unlockedZones: ['init'],
+      earnedBadges: [],
+      createdAt: serverTimestamp() as any,
+      lastActiveAt: serverTimestamp() as any,
+    }
+    await setDoc(userRef, newUser)
+    return newUser
+  }
 }
 
 export async function updateUser(

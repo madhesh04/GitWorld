@@ -1,6 +1,6 @@
 import { BadgeDefinition } from '@/types/gamification'
 import { UserDocument } from '@/types/user'
-import { LESSONS } from '@/lib/curriculum/lessons'
+import { ZONE_LESSONS } from '@/lib/constants'
 
 export const BADGE_DEFINITIONS: BadgeDefinition[] = [
   { id: 'first-commit',       name: 'First Commit',      description: 'Completed your first commit challenge',             icon: '🔨', xpReward: 50 },
@@ -35,24 +35,24 @@ export function checkBadgeConditions(params: CheckParams): BadgeDefinition[] {
     }
   }
 
-  const zoneOneIds = LESSONS.filter((l) => l.zoneId === 'init-valley').map((l) => l.id)
-  const branchIds  = LESSONS.filter((l) => l.zoneId === 'branch-forest').map((l) => l.id)
-  const rebaseIds  = LESSONS.filter((l) => l.zoneId === 'rebase-temple').map((l) => l.id)
+  const zoneOneIds = (ZONE_LESSONS.init || []).map(l => l.id)
+  const branchIds  = (ZONE_LESSONS.branch || []).map(l => l.id)
+  const rebaseIds  = (ZONE_LESSONS.rebase || []).map(l => l.id)
 
   maybeAward('first-commit',      lessonId === 'git-commit')
   maybeAward('no-hints',          hintsUsed === 0)
-  maybeAward('zone-1-complete',   zoneOneIds.every((id) => user.completedLessons.includes(id)))
+  maybeAward('zone-1-complete',   zoneOneIds.length > 0 && zoneOneIds.every((id) => user.completedLessons.includes(id)))
   maybeAward('streak-3',          user.streakDays >= 3)
   maybeAward('streak-7',          user.streakDays >= 7)
-  maybeAward('branch-master',     branchIds.every((id) => user.completedLessons.includes(id)))
+  maybeAward('branch-master',     branchIds.length > 0 && branchIds.every((id) => user.completedLessons.includes(id)))
   maybeAward('conflict-resolver', lessonId === 'merge-conflicts')
-  maybeAward('rebase-sage',       rebaseIds.every((id) => user.completedLessons.includes(id)))
+  maybeAward('rebase-sage',       rebaseIds.length > 0 && rebaseIds.every((id) => user.completedLessons.includes(id)))
   maybeAward('speedrunner',       completionTimeMs < 60_000)
+  
+  const allKnownLessonIds = Object.values(ZONE_LESSONS).flat().map(l => l.id);
   maybeAward('perfectionist',
     attempts === 1 && hintsUsed === 0 &&
-    user.completedLessons.filter((id) =>
-      LESSONS.find((l) => l.id === id)
-    ).length >= 4
+    user.completedLessons.filter((id) => allKnownLessonIds.includes(id)).length >= 4
   )
 
   return earned

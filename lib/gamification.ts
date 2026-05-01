@@ -87,7 +87,9 @@ export function checkAndGetStreak(): StreakInfo {
 // XP Persistence
 // ─────────────────────────────────────────────────────────────────
 
-const XP_KEY = "gw_total_xp";
+const XP_KEY      = "gw_total_xp";
+const LESSONS_KEY = "gw_completed_lessons";
+const BADGES_KEY  = "gw_earned_badges";
 
 export function loadXp(): number {
   if (typeof window === "undefined") return 0;
@@ -97,4 +99,28 @@ export function loadXp(): number {
 export function saveXp(xp: number): void {
   if (typeof window === "undefined") return;
   localStorage.setItem(XP_KEY, String(xp));
+}
+
+export function loadCompletedLessons(): string[] {
+  if (typeof window === "undefined") return [];
+  try {
+    return JSON.parse(localStorage.getItem(LESSONS_KEY) ?? "[]");
+  } catch { return []; }
+}
+
+export function saveCompletedLessons(lessons: string[]): void {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(LESSONS_KEY, JSON.stringify(lessons));
+}
+
+export function loadEarnedBadges(): string[] {
+  if (typeof window === "undefined") return [];
+  try {
+    return JSON.parse(localStorage.getItem(BADGES_KEY) ?? "[]");
+  } catch { return []; }
+}
+
+export function saveEarnedBadges(badges: string[]): void {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(BADGES_KEY, JSON.stringify(badges));
 }

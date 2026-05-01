@@ -5,17 +5,9 @@ import { useGameState } from '@/components/gamification/GameStateProvider';
 import { TopNav } from '@/components/ui/TopNav';
 import { PixelButton } from '@/components/ui/PixelButton';
 import { Confetti } from '@/components/ui/background/Confetti';
+import { CHALLENGES } from '@/lib/constants';
 
-const INITIAL_FS = {
-  files: ["hero.js", "notes.txt", ".env"],
-  staged: [] as string[],
-  committed: [] as string[],
-  branch: "main",
-  lastMsg: null as string | null,
-  lastSha: null as string | null,
-};
-
-function runGit(state: typeof INITIAL_FS, raw: string) {
+function runGit(state: any, raw: string) {
   const args = raw.trim().split(/\s+/);
   const cmd = args[0];
   if (cmd === "git" && args[1] === "status") {
@@ -24,22 +16,36 @@ function runGit(state: typeof INITIAL_FS, raw: string) {
     if (state.staged.length) {
       out.push({ c: "white-70", t: "Changes to be committed:" });
       out.push({ c: "white-50", t: '  (use "git restore --staged <file>..." to unstage)' });
-      state.staged.forEach(f => out.push({ c: "green", t: `        new file:   ${f}` }));
+      state.staged.forEach((f: string) => out.push({ c: "green", t: `        new file:   ${f}` }));
     }
-    const untracked = state.files.filter(f => !state.staged.includes(f) && !state.committed.includes(f));
+    const untracked = state.files.filter((f: string) => !state.staged.includes(f) && !state.committed.includes(f));
     if (untracked.length) {
       out.push({ c: "white-70", t: "Untracked files:" });
       out.push({ c: "white-50", t: '  (use "git add <file>..." to include in what will be committed)' });
-      untracked.forEach(f => out.push({ c: "red", t: `        ${f}` }));
+      untracked.forEach((f: string) => out.push({ c: "red", t: `        ${f}` }));
     }
     if (!state.staged.length && !untracked.length) out.push({ c: "white-70", t: "nothing to commit, working tree clean" });
     return { state, out };
+  }
+  if (cmd === "git" && args[1] === "init") {
+    return { state: { ...state, initialized: true }, out: [{ c: "green", t: "Initialized empty Git repository in /project/.git/" }] };
+  }
+  if (cmd === "git" && args[1] === "clone") {
+    const url = args[2] || "starter.git";
+    return { 
+      state: { ...state, cloned: true }, 
+      out: [
+        { c: "white-70", t: `Cloning into '${url.split('/').pop()?.replace('.git','')}'...` },
+        { c: "white-50", t: "remote: Enumerating objects: 12, done." },
+        { c: "white-50", t: "Receiving objects: 100% (12/12), done." },
+      ] 
+    };
   }
   if (cmd === "git" && args[1] === "add") {
     const target = args[2];
     if (!target) return { state, out: [{ c: "red", t: "Nothing specified, nothing added." }] };
     if (target === ".") {
-      const all = state.files.filter(f => !state.committed.includes(f));
+      const all = state.files.filter((f: string) => !state.committed.includes(f));
       return { state: { ...state, staged: [...new Set([...state.staged, ...all])] }, out: [{ c: "white-30", t: "(no output — files staged successfully)" }] };
     }
     if (!state.files.includes(target)) return { state, out: [{ c: "red", t: `fatal: pathspec '${target}' did not match any files` }] };
@@ -80,19 +86,13 @@ function runGit(state: typeof INITIAL_FS, raw: string) {
   }
   if (cmd === "git" && args[1] === "help") {
     return { state, out: [
-      { c: "amber", t: "Available: git status, git add <file>, git commit -m \"msg\", git log, git reset" },
+      { c: "amber", t: "Available: git status, git init, git clone, git add <file>, git commit -m \"msg\", git log, git reset" },
     ]};
   }
   if (cmd === "clear") return { state, out: "__CLEAR__" };
   if (!cmd) return { state, out: [] };
   return { state, out: [{ c: "red", t: `command not found: ${raw}` }] };
 }
-
-const HINTS = [
-  "Use `git status` to see which files are untracked.",
-  "Use `git add hero.js` to stage just hero.js — don't use `git add .` here.",
-  "Then run `git commit -m \"feat: add hero\"` to forge your commit.",
-];
 
 const COLOR_MAP: Record<string, string> = {
   "amber": "var(--amber)",
@@ -108,18 +108,35 @@ const COLOR_MAP: Record<string, string> = {
 export default function ChallengePage({ params }: { params: Promise<{ zoneId: string }> }) {
   const { zoneId } = use(params);
   const router = useRouter();
-  const { awardXp } = useGameState();
+  const { awardXp, completeLesson } = useGameState();
 
-  const [state, setState] = useState(INITIAL_FS);
+  const challenge = CHALLENGES[zoneId] || CHALLENGES.forge;
+
+  const [state, setState] = useState({
+    files: challenge.files,
+    staged: [],
+    committed: [],
+    branch: "main",
+    lastMsg: null,
+    lastSha: null,
+    initialized: false,
+    cloned: false,
+  });
+
   const [history, setHistory] = useState<any[]>([
     { c: "dim-green", t: "GitWorld Terminal v1.0 — Type 'git help' for commands" },
     { c: "white-70", t: "" },
-    { c: "amber", t: "CHALLENGE: Stage hero.js and commit with message 'feat: add hero'" },
+    { c: "amber", t: `CHALLENGE: ${challenge.objective}` },
     { c: "white-70", t: "" },
   ]);
   const [input, setInput] = useState("");
   const [hintsUsed, setHintsUsed] = useState(0);
-  const [feedback, setFeedback] = useState<any>({ kind: "neutral", title: "Begin when ready", body: "Type a git command to inspect the working tree, then stage and commit hero.js.", lastCmd: null });
+  const [feedback, setFeedback] = useState<any>({ 
+    kind: "neutral", 
+    title: "Begin when ready", 
+    body: challenge.body, 
+    lastCmd: null 
+  });
   const [success, setSuccess] = useState(false);
   const [cmdHistory, setCmdHistory] = useState<string[]>([]);
   const [histIdx, setHistIdx] = useState(-1);
@@ -151,38 +168,22 @@ export default function ChallengePage({ params }: { params: Promise<{ zoneId: st
     setState(result.state);
     setInput("");
 
-    // feedback logic
-    if (cmd.startsWith("git status")) {
-      setFeedback({ kind: "ok", title: "✓ git status", body: "You can see the untracked files. Stage hero.js next.", lastCmd: cmd });
-    } else if (cmd.startsWith("git add")) {
-      const target = cmd.split(/\s+/)[2];
-      if (target === "hero.js") {
-        setFeedback({ kind: "ok", title: "✓ git add hero.js", body: "File staged! hero.js is now in the staging area. Now commit your changes with a clear message using -m.", lastCmd: cmd });
-      } else if (target === "." || target === "notes.txt" || target === ".env") {
-        setFeedback({ kind: "warn", title: "⚠ Wrong files staged", body: `You staged ${target === "." ? "everything" : target} — but the challenge wants ONLY hero.js. Run \`git reset\` then \`git add hero.js\`.`, lastCmd: cmd });
-      } else {
-        setFeedback({ kind: "warn", title: "⚠ File not found", body: `'${target}' isn't in the working directory. Try \`git status\` to see available files.`, lastCmd: cmd });
+    // Use dynamic validation logic from the challenge definition
+    const validation = challenge.validation(result.state, cmd);
+    if (validation.ok) {
+      setFeedback({ kind: "ok", title: "✓ Challenge complete!", body: validation.msg, lastCmd: cmd });
+      setTimeout(() => setSuccess(true), 600);
+    } else {
+      // Basic feedback if not complete
+      if (cmd.startsWith("git status")) {
+        setFeedback({ kind: "ok", title: "✓ git status", body: "Good. Inspect your working tree to know your next move.", lastCmd: cmd });
+      } else if (cmd.startsWith("git init")) {
+        setFeedback({ kind: "ok", title: "✓ git init", body: "Repository started! Keep going.", lastCmd: cmd });
+      } else if (cmd.startsWith("git add")) {
+        setFeedback({ kind: "neutral", title: "File staged", body: "Check with `git status` to see your staging area.", lastCmd: cmd });
+      } else if (cmd.startsWith("git")) {
+        setFeedback({ kind: "neutral", title: "Command processed", body: "Keep following the objective.", lastCmd: cmd });
       }
-    } else if (cmd.startsWith("git commit")) {
-      if ((result as any).committed) {
-        const c = (result as any).committed;
-        const stagedHero = c.files.length === 1 && c.files[0] === "hero.js";
-        const msgOk = c.msg.trim() === "feat: add hero";
-        if (stagedHero && msgOk) {
-          setFeedback({ kind: "ok", title: "✓ Challenge complete!", body: "You forged your first commit, traveler. Triggering reward...", lastCmd: cmd });
-          setTimeout(() => setSuccess(true), 600);
-        } else if (stagedHero && !msgOk) {
-          setFeedback({ kind: "warn", title: "⚠ Wrong commit message", body: `Your commit message was "${c.msg}" but the challenge wants exactly "feat: add hero".`, lastCmd: cmd });
-        } else {
-          setFeedback({ kind: "warn", title: "⚠ Wrong files committed", body: "You committed extra files. Use \`git reset\` and try again with only hero.js.", lastCmd: cmd });
-        }
-      } else {
-        setFeedback({ kind: "err", title: "✗ Commit failed", body: (result.out as any)[0]?.t || "Try again.", lastCmd: cmd });
-      }
-    } else if (cmd.startsWith("git log") || cmd.startsWith("git help") || cmd === "clear") {
-      // ignore
-    } else if (cmd.startsWith("git")) {
-      setFeedback({ kind: "neutral", title: "Hmm…", body: "That command isn't part of this challenge. Try `git status`, `git add`, or `git commit`.", lastCmd: cmd });
     }
   };
 
@@ -201,10 +202,10 @@ export default function ChallengePage({ params }: { params: Promise<{ zoneId: st
   };
 
   const revealHint = () => {
-    if (hintsUsed >= HINTS.length) return;
-    const h = HINTS[hintsUsed];
+    if (hintsUsed >= challenge.hints.length) return;
+    const h = challenge.hints[hintsUsed];
     setHintsUsed(hintsUsed + 1);
-    setFeedback({ kind: "hint", title: `HINT ${hintsUsed + 1}/${HINTS.length}`, body: h, lastCmd: feedback.lastCmd });
+    setFeedback({ kind: "hint", title: `HINT ${hintsUsed + 1}/${challenge.hints.length}`, body: h, lastCmd: feedback.lastCmd });
   };
 
   const multiplier = 1 + Math.max(0, (3 - hintsUsed) * 0.2) + 0.3;
@@ -212,17 +213,21 @@ export default function ChallengePage({ params }: { params: Promise<{ zoneId: st
   
   const onSuccessOverlayContinue = () => {
     setSuccess(false);
+    
+    // Mark challenge as complete to unlock next zone
+    completeLesson(`challenge-${zoneId}`, zoneId);
+
     awardXp({
-      baseXp: 100,
+      baseXp: challenge.xp,
       hintsUsed,
       firstTry: hintsUsed === 0,
-      label: "git commit challenge complete!",
-      badgeName: hintsUsed === 0 ? "PURE INSTINCT" : undefined,
-      badgeIcon: "🎯",
-      badgeDesc: "Completed a challenge without hints",
+      label: `${challenge.title} challenge complete!`,
+      badgeName: hintsUsed === 0 ? challenge.badge : undefined,
+      badgeIcon: challenge.badgeIcon,
+      badgeDesc: "Completed a zone challenge without hints",
       badgeXp: 75,
     });
-    router.push(`/zone/${zoneId}`);
+    router.push(`/world`);
   };
 
   return (
@@ -234,20 +239,20 @@ export default function ChallengePage({ params }: { params: Promise<{ zoneId: st
         display: "flex", gap: 32, minHeight: 128, alignItems: "center" }}>
         <div style={{ flex: 1 }}>
           <div className="t-pixel" style={{ fontSize: 8, color: "var(--amber)", letterSpacing: 3, marginBottom: 8 }}>OBJECTIVE</div>
-          <div className="t-pixel" style={{ fontSize: 13, color: "#fff", letterSpacing: 1, marginBottom: 10 }}>Forge Your First Commit</div>
+          <div className="t-pixel" style={{ fontSize: 13, color: "#fff", letterSpacing: 1, marginBottom: 10 }}>{challenge.title}</div>
           <div className="t-body" style={{ fontSize: 13, color: "var(--white-70)", lineHeight: 1.5 }}>
-            Stage the file <span className="code-inline">hero.js</span> and commit it with the message <span className="code-inline">feat: add hero</span>. Do NOT stage <span className="code-inline">notes.txt</span> or <span className="code-inline">.env</span>.
+            {challenge.body}
           </div>
         </div>
         <div style={{ width: 280 }}>
           <div className="t-pixel" style={{ fontSize: 14, color: "var(--amber)", letterSpacing: 1, marginBottom: 6,
-            textShadow: "0 0 12px rgba(245,158,11,0.6)" }}>⭐ 100 XP</div>
+            textShadow: "0 0 12px rgba(245,158,11,0.6)" }}>⭐ {challenge.xp} XP</div>
           <div className="t-pixel" style={{ fontSize: 7, color: "var(--white-40)", letterSpacing: 1, marginBottom: 12 }}>
             Up to {cappedMult.toFixed(2)}x with no hints
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 12, justifyContent: "space-between" }}>
-            <span className="t-pixel" style={{ fontSize: 8, color: "var(--white-50)", letterSpacing: 1 }}>HINTS: {hintsUsed}/{HINTS.length}</span>
-            <PixelButton size="sm" variant="secondary" onClick={revealHint} disabled={hintsUsed >= HINTS.length}>REVEAL HINT</PixelButton>
+            <span className="t-pixel" style={{ fontSize: 8, color: "var(--white-50)", letterSpacing: 1 }}>HINTS: {hintsUsed}/{challenge.hints.length}</span>
+            <PixelButton size="sm" variant="secondary" onClick={revealHint} disabled={hintsUsed >= challenge.hints.length}>REVEAL HINT</PixelButton>
           </div>
           <div className="t-pixel" style={{ fontSize: 7, color: "#fb923c", letterSpacing: 1, marginTop: 8 }}>⚠ Hints reduce XP reward</div>
         </div>
@@ -265,7 +270,7 @@ export default function ChallengePage({ params }: { params: Promise<{ zoneId: st
           <span style={{ width: 12, height: 12, background: "#ffbd2e", borderRadius: 0 }} />
           <span style={{ width: 12, height: 12, background: "#27c93f", borderRadius: 0 }} />
           <span className="t-mono" style={{ fontSize: 12, color: "var(--white-40)", margin: "0 auto" }}>gitworld — bash</span>
-          <span className="t-mono" style={{ fontSize: 11, color: "var(--white-30)" }}>~/challenge/commit-forge</span>
+          <span className="t-mono" style={{ fontSize: 11, color: "var(--white-30)" }}>~/challenge/{zoneId}</span>
         </div>
 
         {/* scrollback */}
@@ -317,39 +322,29 @@ export default function ChallengePage({ params }: { params: Promise<{ zoneId: st
             {feedback.body}
           </div>
           <div className="t-mono" style={{ fontSize: 11, color: "var(--white-40)", marginTop: 12 }}>
-            STAGED: {state.staged.join(", ") || "(none)"}  ·  UNTRACKED: {state.files.filter(f => !state.staged.includes(f) && !state.committed.includes(f)).join(", ") || "(none)"}
-            {state.committed.length > 0 && <>  ·  COMMITTED: {state.committed.join(", ")}</>}
+            {state.initialized && <span style={{ color: "var(--pixel-green)" }}>REPO INITIALIZED  ·  </span>}
+            FILES: {state.files.join(", ")}
+            {state.staged.length > 0 && <span style={{ color: "var(--pixel-green)" }}>  ·  STAGED: {state.staged.join(", ")}</span>}
           </div>
         </div>
         <div style={{ width: 260 }}>
-          {feedback.kind === "hint" ? (
-            <>
-              <div className="t-pixel" style={{ fontSize: 8, color: "#fb923c", letterSpacing: 2, marginBottom: 8 }}>{feedback.title}</div>
-              <div className="pixel-border-subtle" style={{ background: "var(--navy-darker)", padding: 12 }}>
-                <div className="t-body" style={{ fontSize: 12, color: "var(--white-90)", lineHeight: 1.5 }}>{feedback.body}</div>
-              </div>
-              <div className="t-pixel" style={{ fontSize: 7, color: "#fb923c", letterSpacing: 1, marginTop: 8 }}>⚠ Hint used: -0.2x multiplier</div>
-            </>
-          ) : (
-            <>
-              <div className="t-pixel" style={{ fontSize: 8, color: "var(--white-50)", letterSpacing: 2, marginBottom: 8 }}>QUICK COMMANDS</div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                {["git status", "git add hero.js", "git commit -m \"feat: add hero\""].map(c => (
-                  <button key={c} onClick={() => { setInput(c); inputRef.current?.focus(); }}
-                    className="t-mono pixel-border-subtle"
-                    style={{
-                      textAlign: "left", padding: "8px 10px", background: "var(--navy-darker)",
-                      color: "var(--pixel-green)", border: 0, fontSize: 11, cursor: "pointer",
-                    }}>$ {c}</button>
-                ))}
-              </div>
-            </>
-          )}
+          <div className="t-pixel" style={{ fontSize: 8, color: "var(--white-50)", letterSpacing: 2, marginBottom: 8 }}>QUICK COMMANDS</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            {(zoneId === "init" ? ["git init", "git clone"] : ["git status", "git add", "git commit"]).map(c => (
+              <button key={c} onClick={() => { setInput(c); inputRef.current?.focus(); }}
+                className="t-mono pixel-border-subtle"
+                style={{
+                  textAlign: "left", padding: "8px 10px", background: "var(--navy-darker)",
+                  color: "var(--pixel-green)", border: 0, fontSize: 11, cursor: "pointer",
+                }}>$ {c}</button>
+            ))}
+          </div>
         </div>
       </div>
 
       {success && <SuccessOverlay
-        baseXp={100} hintsUsed={hintsUsed} firstTry={hintsUsed === 0}
+        baseXp={challenge.xp} hintsUsed={hintsUsed} firstTry={hintsUsed === 0}
+        badgeIcon={challenge.badgeIcon} badgeName={challenge.badge}
         onContinue={onSuccessOverlayContinue}
         onBack={() => { setSuccess(false); router.push(`/zone/${zoneId}`); }}
       />}
@@ -357,7 +352,7 @@ export default function ChallengePage({ params }: { params: Promise<{ zoneId: st
   );
 }
 
-function SuccessOverlay({ baseXp, hintsUsed, firstTry, onContinue, onBack }: any) {
+function SuccessOverlay({ baseXp, hintsUsed, firstTry, badgeIcon, badgeName, onContinue, onBack }: any) {
   const noHintsMult = hintsUsed === 0 ? 1.5 : null;
   const firstTryMult = firstTry ? 1.3 : null;
   const total = Math.round(baseXp * (noHintsMult || 1) * (firstTryMult || 1));
@@ -391,17 +386,16 @@ function SuccessOverlay({ baseXp, hintsUsed, firstTry, onContinue, onBack }: any
           <div style={{ display: "flex", gap: 12, alignItems: "center", marginTop: 20,
             padding: 12, background: "rgba(245,158,11,0.06)" }}>
             <div className="pixel-border-subtle" style={{ width: 56, height: 56, background: "var(--navy-darker)",
-              display: "flex", alignItems: "center", justifyContent: "center", fontSize: 28 }}>🔨</div>
+              display: "flex", alignItems: "center", justifyContent: "center", fontSize: 28 }}>{badgeIcon || "🔨"}</div>
             <div>
               <span className="pixel-chip green" style={{ fontSize: 6 }}>NEW BADGE</span>
-              <div className="t-pixel" style={{ fontSize: 8, color: "var(--amber)", letterSpacing: 1, marginTop: 6 }}>FIRST COMMIT</div>
+              <div className="t-pixel" style={{ fontSize: 8, color: "var(--amber)", letterSpacing: 1, marginTop: 6 }}>{badgeName || "ACHIEVER"}</div>
             </div>
           </div>
         )}
 
         <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 24 }}>
-          <PixelButton onClick={onContinue} style={{ width: "100%" }}>NEXT LESSON →</PixelButton>
-          <PixelButton variant="secondary" onClick={onBack} style={{ width: "100%" }}>BACK TO ZONE</PixelButton>
+          <PixelButton onClick={onContinue} style={{ width: "100%" }}>CONTINUE JOURNEY →</PixelButton>
         </div>
       </div>
     </div>

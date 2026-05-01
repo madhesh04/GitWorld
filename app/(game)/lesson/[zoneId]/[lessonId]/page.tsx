@@ -3,7 +3,8 @@ import React, { useState, useRef, useEffect, use } from 'react';
 import { useRouter } from 'next/navigation';
 import { useGameState } from '@/components/gamification/GameStateProvider';
 import { TopNav } from '@/components/ui/TopNav';
-import { LESSON_CONTENT } from '@/lib/constants';
+import { LESSON_CONTENT, ZONE_LESSONS } from '@/lib/constants';
+import { PixelButton } from '@/components/ui/PixelButton';
 
 /* ── Inline text parser: **bold** and `code` and *italic* ── */
 function richText(t: string) {
@@ -11,7 +12,6 @@ function richText(t: string) {
   let s = t;
   let key = 0;
   while (s.length) {
-    // find the earliest marker
     const bold   = s.match(/\*\*([^*]+)\*\*/);
     const code   = s.match(/`([^`]+)`/);
     const italic = s.match(/\*([^*]+)\*/);
@@ -37,7 +37,6 @@ function richText(t: string) {
   return parts;
 }
 
-/* ── HOW A COMMIT WORKS diagram ── */
 function DiagramHowCommit() {
   const stages = [
     { label: "WORKING", icon: "📁" },
@@ -66,7 +65,6 @@ function DiagramHowCommit() {
             </g>
           );
         })}
-        {/* arrows */}
         {[0, 1].map(i => {
           const x1 = (i + 1) * boxW + i * gap;
           const x2 = x1 + gap;
@@ -91,7 +89,6 @@ function DiagramHowCommit() {
   );
 }
 
-/* ── Good/Bad commit message comparison ── */
 function GoodBadCompare() {
   return (
     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, margin: "24px 0" }}>
@@ -119,17 +116,15 @@ function GoodBadCompare() {
   );
 }
 
-/* ── Main Lesson Page ── */
-export default function LessonPage({
-  params,
-}: {
-  params: Promise<{ zoneId: string; lessonId: string }>;
-}) {
+export default function LessonPage({ params }: { params: Promise<{ zoneId: string; lessonId: string }> }) {
   const { zoneId, lessonId } = use(params);
   const router = useRouter();
-  const { user } = useGameState();
+  const { user, completeLesson } = useGameState();
 
-  const lesson = LESSON_CONTENT[lessonId] ?? LESSON_CONTENT["git-commit"];
+  const lesson = LESSON_CONTENT[lessonId] ?? LESSON_CONTENT["what-is-git"];
+  const zoneLessons = ZONE_LESSONS[zoneId] || [];
+  const lessonIdx = zoneLessons.findIndex(l => l.id === lessonId);
+  const nextLesson = zoneLessons[lessonIdx + 1];
 
   const [scrollPct, setScrollPct] = useState(0);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -143,20 +138,24 @@ export default function LessonPage({
 
   useEffect(() => { handleScroll(); }, []);
 
-  const unlocked = scrollPct > 92;
+  const unlocked = scrollPct > 92 || user.completedLessons.includes(lessonId);
+
+  const onFinish = () => {
+    completeLesson(lessonId, zoneId);
+    if (nextLesson) {
+      router.push(`/lesson/${zoneId}/${nextLesson.id}`);
+    } else {
+      router.push(`/zone/${zoneId}`);
+    }
+  };
 
   return (
-    /*
-     * Layout: fixed TopNav (48px) + fixed breadcrumb (40px) + scrollable body + fixed bottom bar (72px)
-     * We achieve this with a flex-column on the full viewport height.
-     */
     <div style={{ height: "100vh", display: "flex", flexDirection: "column", background: "#0a0e1a" }}>
-      {/* Fixed top nav */}
       <TopNav />
 
-      {/* Breadcrumb — sits directly below the nav */}
+      {/* Breadcrumb */}
       <div style={{
-        marginTop: 48,               /* clear the fixed TopNav */
+        marginTop: 48,
         height: 40,
         flexShrink: 0,
         background: "#0d1424",
@@ -179,9 +178,7 @@ export default function LessonPage({
                 fontFamily: "var(--font-pixel)",
                 fontSize: 7,
                 letterSpacing: 1.5,
-                color: i === lesson.breadcrumb.length - 1
-                  ? "#f59e0b"
-                  : "rgba(255,255,255,0.45)",
+                color: i === lesson.breadcrumb.length - 1 ? "#f59e0b" : "rgba(255,255,255,0.45)",
                 padding: 0,
               }}
             >
@@ -194,15 +191,13 @@ export default function LessonPage({
         ))}
       </div>
 
-      {/* Scrollable lesson content */}
+      {/* Scrollable content */}
       <div
         ref={scrollRef}
         onScroll={handleScroll}
-        style={{ flex: 1, overflowY: "auto", paddingBottom: 88 }}
+        style={{ flex: 1, overflowY: "auto", paddingBottom: 100 }}
       >
         <div style={{ maxWidth: 700, margin: "0 auto", padding: "32px 28px 24px" }}>
-
-          {/* Zone chip */}
           <div style={{
             display: "inline-flex",
             alignItems: "center",
@@ -219,192 +214,73 @@ export default function LessonPage({
             ✦ {lesson.zoneLabel.replace(/^.*? /, '')}
           </div>
 
-          {/* Title */}
           <h1 style={{
-            fontFamily: "var(--font-pixel)",
-            fontSize: 24,
-            color: "#ffffff",
-            letterSpacing: 1,
-            marginBottom: 10,
-            lineHeight: 1.2,
+            fontFamily: "var(--font-pixel)", fontSize: 24, color: "#ffffff",
+            letterSpacing: 1, marginBottom: 10, lineHeight: 1.2,
           }}>
             {lesson.title}
           </h1>
 
-          {/* Meta: read time + XP */}
           <div style={{
-            fontFamily: "var(--font-pixel)",
-            fontSize: 7,
-            color: "rgba(255,255,255,0.38)",
-            letterSpacing: 1.5,
-            marginBottom: 20,
-            display: "flex",
-            gap: 12,
-            alignItems: "center",
+            fontFamily: "var(--font-pixel)", fontSize: 7, color: "rgba(255,255,255,0.38)",
+            letterSpacing: 1.5, marginBottom: 20, display: "flex", gap: 12, alignItems: "center",
           }}>
             <span>⏱ {lesson.readTime} MIN READ</span>
             <span style={{ opacity: 0.4 }}>·</span>
             <span>⭐ {lesson.xp} XP</span>
           </div>
 
-          {/* Divider */}
           <div style={{ height: 1, background: "rgba(245,158,11,0.25)", marginBottom: 28 }} />
 
-          {/* Body blocks */}
           {lesson.body.map((b: any, i: number) => {
-            /* ── paragraph ── */
-            if (b.type === "p") return (
-              <p key={i} style={{
-                fontFamily: "var(--font-body)",
-                fontSize: 14,
-                lineHeight: 1.85,
-                color: "rgba(255,255,255,0.85)",
-                marginBottom: 18,
-              }}>
-                {richText(b.text)}
-              </p>
-            );
-
-            /* ── callout ── */
-            if (b.type === "callout") return (
-              <div key={i} style={{
-                background: "rgba(245,158,11,0.06)",
-                borderLeft: "3px solid #f59e0b",
-                padding: "13px 16px",
-                margin: "20px 0",
-              }}>
-                <div style={{
-                  fontFamily: "var(--font-body)",
-                  fontSize: 13,
-                  color: "rgba(255,255,255,0.85)",
-                  lineHeight: 1.65,
-                }}>
-                  💡 {b.text}
-                </div>
-              </div>
-            );
-
-            /* ── terminal code block ── */
-            if (b.type === "code") return (
-              <div key={i} style={{ margin: "22px 0" }}>
-                {/* title bar */}
-                <div style={{
-                  background: "#0a0f1e",
-                  borderBottom: "1px solid rgba(245,158,11,0.15)",
-                  padding: "7px 12px",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  boxShadow: "-2px 0 0 0 rgba(245,158,11,0.35), 2px 0 0 0 rgba(245,158,11,0.35), 0 -2px 0 0 rgba(245,158,11,0.35), 0 2px 0 0 rgba(245,158,11,0.35)",
-                }}>
-                  <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "rgba(255,255,255,0.4)" }}>
-                    · · · TERMINAL
-                  </span>
-                  <button style={{
-                    background: "none", border: "none", cursor: "pointer",
-                    fontFamily: "var(--font-pixel)", fontSize: 7,
-                    color: "rgba(255,255,255,0.4)", letterSpacing: 1,
-                  }}>
-                    COPY
-                  </button>
-                </div>
-                {/* code body */}
-                <pre style={{
-                  margin: 0,
-                  padding: "14px 16px",
-                  fontFamily: "var(--font-mono)",
-                  fontSize: 13,
-                  lineHeight: 1.7,
-                  background: "#0d1117",
-                  overflowX: "auto",
-                  boxShadow: "-2px 0 0 0 rgba(245,158,11,0.35), 2px 0 0 0 rgba(245,158,11,0.35), 0 -2px 0 0 rgba(245,158,11,0.35), 0 2px 0 0 rgba(245,158,11,0.35)",
-                }}>
-                  {b.lines.map((l: any, j: number) => {
-                    const color =
-                      l.kind === "prompt" ? "#f59e0b"
-                      : l.kind === "cmd"  ? "#00ff41"
-                      : "rgba(255,255,255,0.65)";
-                    return (
-                      <span key={j} style={{ color, display: l.kind === "prompt" ? "inline" : "block" }}>
-                        {l.text}
-                      </span>
-                    );
-                  })}
-                </pre>
-              </div>
-            );
-
-            /* ── diagram ── */
+            if (b.type === "p") return <p key={i} style={{ fontFamily: "var(--font-body)", fontSize: 14, lineHeight: 1.85, color: "rgba(255,255,255,0.85)", marginBottom: 18 }}>{richText(b.text)}</p>;
+            if (b.type === "callout") return <div key={i} style={{ background: "rgba(245,158,11,0.06)", borderLeft: "3px solid #f59e0b", padding: "13px 16px", margin: "20px 0" }}><div style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "rgba(255,255,255,0.85)", lineHeight: 1.65 }}>💡 {b.text}</div></div>;
+            if (b.type === "code") return <div key={i} style={{ margin: "22px 0" }}><div style={{ background: "#0a0f1e", borderBottom: "1px solid rgba(245,158,11,0.15)", padding: "7px 12px", display: "flex", alignItems: "center", justifyContent: "space-between", boxShadow: "-2px 0 0 0 rgba(245,158,11,0.35), 2px 0 0 0 rgba(245,158,11,0.35), 0 -2px 0 0 rgba(245,158,11,0.35), 0 2px 0 0 rgba(245,158,11,0.35)" }}><span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "rgba(255,255,255,0.4)" }}>· · · TERMINAL</span></div><pre style={{ margin: 0, padding: "14px 16px", fontFamily: "var(--font-mono)", fontSize: 13, lineHeight: 1.7, background: "#0d1117", overflowX: "auto", boxShadow: "-2px 0 0 0 rgba(245,158,11,0.35), 2px 0 0 0 rgba(245,158,11,0.35), 0 -2px 0 0 rgba(245,158,11,0.35), 0 2px 0 0 rgba(245,158,11,0.35)" }}>{b.lines.map((l: any, j: number) => <span key={j} style={{ color: l.kind === "prompt" ? "#f59e0b" : l.kind === "cmd" ? "#00ff41" : "rgba(255,255,255,0.65)", display: l.kind === "prompt" ? "inline" : "block" }}>{l.text}</span>)}</pre></div>;
             if (b.type === "diagram") return <DiagramHowCommit key={i} />;
-
-            /* ── good/bad compare ── */
             if (b.type === "compare") return <GoodBadCompare key={i} />;
-
             return null;
           })}
 
-          {/* Spacer so last content isn't hidden by the bottom bar */}
-          <div style={{ height: 60 }} />
+          {/* New Progression Button */}
+          <div style={{ marginTop: 60, textAlign: "center", paddingTop: 40, borderTop: "1px solid rgba(255,255,255,0.1)" }}>
+             {unlocked ? (
+                <div className="fade-in">
+                   <div className="t-pixel" style={{ fontSize: 10, color: "var(--amber)", letterSpacing: 2, marginBottom: 20 }}>LESSON COMPLETE!</div>
+                   <PixelButton onClick={onFinish} size="lg">
+                      {nextLesson ? `GO TO: ${nextLesson.title} →` : "BACK TO ZONE SUMMARY →"}
+                   </PixelButton>
+                </div>
+             ) : (
+                <div style={{ color: "var(--white-30)", fontSize: 10, letterSpacing: 2 }} className="t-pixel">
+                   SCROLL TO THE BOTTOM TO FINISH
+                </div>
+             )}
+          </div>
         </div>
       </div>
 
-      {/* ── Fixed bottom bar ── */}
+      {/* Bottom Bar */}
       <div style={{
-        position: "fixed",
-        bottom: 0, left: 0, right: 0,
-        height: 72,
-        background: "#0d1424",
-        boxShadow: "0 -3px 0 0 #f59e0b",
-        display: "flex",
-        alignItems: "center",
-        padding: "0 28px",
-        zIndex: 50,
-        gap: 24,
+        position: "fixed", bottom: 0, left: 0, right: 0,
+        height: 72, background: "#0d1424", boxShadow: "0 -3px 0 0 #f59e0b",
+        display: "flex", alignItems: "center", padding: "0 28px", zIndex: 50, gap: 24,
       }}>
-        {/* Left: scroll progress */}
         <div style={{ flex: 1, maxWidth: 360 }}>
-          <div style={{
-            fontFamily: "var(--font-pixel)",
-            fontSize: 7,
-            color: unlocked ? "#f59e0b" : "rgba(255,255,255,0.35)",
-            letterSpacing: 1.5,
-            marginBottom: 8,
-          }}>
-            {unlocked ? "✓ READY — ENTER THE CHALLENGE" : "SCROLL TO UNLOCK CHALLENGE"}
+          <div style={{ fontFamily: "var(--font-pixel)", fontSize: 7, color: unlocked ? "#f59e0b" : "rgba(255,255,255,0.35)", letterSpacing: 1.5, marginBottom: 8 }}>
+            {unlocked ? "✓ PROGRESS UNLOCKED" : "FINISH READING TO PROGRESS"}
           </div>
           <div style={{ height: 3, background: "#1e2a3a" }}>
-            <div style={{
-              width: scrollPct + "%",
-              height: "100%",
-              background: "linear-gradient(90deg, #f59e0b, #ea580c)",
-              transition: "width 200ms",
-              boxShadow: unlocked ? "0 0 8px rgba(245,158,11,0.7)" : "none",
-            }} />
+            <div style={{ width: scrollPct + "%", height: "100%", background: "linear-gradient(90deg, #f59e0b, #ea580c)", transition: "width 200ms", boxShadow: unlocked ? "0 0 8px rgba(245,158,11,0.7)" : "none" }} />
           </div>
         </div>
 
-        {/* Right: challenge button */}
-        <button
-          onClick={() => unlocked && router.push(`/challenge/${zoneId}`)}
-          disabled={!unlocked}
-          style={{
-            fontFamily: "var(--font-pixel)",
-            fontSize: 10,
-            letterSpacing: 1.5,
-            border: "none",
-            padding: "13px 22px",
-            cursor: unlocked ? "pointer" : "not-allowed",
-            background: unlocked ? "#f59e0b" : "#1e2a3a",
-            color: unlocked ? "#0a0e1a" : "rgba(255,255,255,0.3)",
-            boxShadow: unlocked
-              ? "-3px 0 0 0 #f59e0b, 3px 0 0 0 #f59e0b, 0 -3px 0 0 #f59e0b, 0 3px 0 0 #f59e0b, 0 0 16px rgba(245,158,11,0.4)"
-              : "-3px 0 0 0 rgba(245,158,11,0.2), 3px 0 0 0 rgba(245,158,11,0.2), 0 -3px 0 0 rgba(245,158,11,0.2), 0 3px 0 0 rgba(245,158,11,0.2)",
-            transition: "background 200ms, color 200ms",
-            flexShrink: 0,
-          }}
+        <PixelButton 
+          disabled={!unlocked} 
+          onClick={onFinish}
+          variant={unlocked ? "primary" : "secondary"}
         >
-          {unlocked ? "ENTER THE CHALLENGE →" : "CHALLENGE LOCKED 🔒"}
-        </button>
+          {unlocked ? (nextLesson ? "NEXT LESSON →" : "FINISH ZONE →") : "READING... 📖"}
+        </PixelButton>
       </div>
     </div>
   );

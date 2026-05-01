@@ -30,10 +30,10 @@ function ProgressRing({ value, size = 80, label, sublabel }: any) {
   );
 }
 
-function LessonCard({ lesson, onClick }: any) {
-  const isLocked = lesson.status === "locked";
-  const isComplete = lesson.status === "complete";
-  const isAvailable = lesson.status === "available";
+function LessonCard({ lesson, status, onClick }: any) {
+  const isLocked = status === "locked";
+  const isComplete = status === "complete";
+  const isAvailable = status === "available";
 
   return (
     <div
@@ -82,13 +82,33 @@ function LessonCard({ lesson, onClick }: any) {
 export default function ZonePage({ params }: { params: Promise<{ id: string }> }) {
   const { id: zoneId } = use(params);
   const router = useRouter();
+  const { user } = useGameState();
+  
   const zone = ZONES.find(z => z.id === zoneId) || ZONES[0];
   const meta = ZONE_META[zoneId] || ZONE_META.init;
   const lessons = ZONE_LESSONS[zoneId] || ZONE_LESSONS.init;
-  const completed = lessons.filter((l: any) => l.status === "complete").length;
-  const totalXp = lessons.filter((l: any) => l.status === "complete").reduce((a: any, l: any) => a + l.xp, 0);
-  const allDone = completed === lessons.length;
-  const pct = (completed / lessons.length) * 100;
+
+  // Dynamically calculate status for each lesson
+  let foundFirstIncomplete = false;
+  const lessonsWithStatus = lessons.map(l => {
+    const isComplete = user.completedLessons.includes(l.id);
+    let status = "locked";
+    if (isComplete) {
+      status = "complete";
+    } else if (!foundFirstIncomplete) {
+      status = "available";
+      foundFirstIncomplete = true;
+    }
+    return { ...l, status };
+  });
+
+  const completedCount = lessonsWithStatus.filter(l => l.status === "complete").length;
+  const allLessonsDone = completedCount === lessons.length;
+  const pct = (completedCount / lessons.length) * 100;
+  
+  // Challenge status
+  const isChallengeDone = user.completedLessons.includes(`challenge-${zoneId}`);
+  const challengeStatus = isChallengeDone ? "complete" : allLessonsDone ? "available" : "locked";
 
   return (
     <div style={{ minHeight: "100vh", paddingTop: 64 }}>
@@ -116,9 +136,9 @@ export default function ZonePage({ params }: { params: Promise<{ id: string }> }
             </div>
           </div>
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
-            <ProgressRing value={pct} size={88} label={`${completed}/${lessons.length}`} sublabel={allDone ? "COMPLETE" : "IN PROGRESS"} />
+            <ProgressRing value={pct} size={88} label={`${completedCount}/${lessons.length}`} sublabel={allLessonsDone ? "MASTERY" : "IN PROGRESS"} />
             <div className="t-pixel" style={{ fontSize: 9, color: "var(--amber)", letterSpacing: 1 }}>
-              ⭐ {totalXp} XP
+               PROGRESS
             </div>
           </div>
         </div>
@@ -128,25 +148,67 @@ export default function ZonePage({ params }: { params: Promise<{ id: string }> }
       <div style={{ position: "relative", zIndex: 2, maxWidth: 760, margin: "0 auto", padding: "40px 32px 80px" }}>
         <div className="t-pixel" style={{ fontSize: 10, color: "var(--amber)", letterSpacing: 4, marginBottom: 20 }}>LESSONS</div>
         <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-          {lessons.map((l: any) => (
-            <LessonCard key={l.id} lesson={l} onClick={() => l.status !== "locked" && router.push(`/lesson/${zoneId}/${l.id}`)} />
+          {lessonsWithStatus.map((l: any) => (
+            <LessonCard 
+              key={l.id} 
+              lesson={l} 
+              status={l.status}
+              onClick={() => router.push(`/lesson/${zoneId}/${l.id}`)} 
+            />
           ))}
         </div>
 
-        {allDone && (
-          <div style={{ marginTop: 40 }}>
+        {/* Challenge Section */}
+        <div style={{ marginTop: 48 }}>
+          <div className="t-pixel" style={{ fontSize: 10, color: "var(--amber)", letterSpacing: 4, marginBottom: 20 }}>ZONE CHALLENGE</div>
+          <div
+            onClick={challengeStatus !== "locked" ? () => router.push(`/challenge/${zoneId}`) : undefined}
+            className={challengeStatus === "available" ? "pixel-border-heavy amber-glow" : "pixel-border-subtle"}
+            style={{
+              background: challengeStatus === "available" ? "rgba(245,158,11,0.05)" : "var(--navy-mid)", 
+              padding: 28, display: "flex", alignItems: "center", gap: 24,
+              cursor: challengeStatus === "locked" ? "not-allowed" : "pointer",
+              filter: challengeStatus === "locked" ? "grayscale(1) opacity(0.5)" : "none",
+            }}
+          >
+             <div style={{ fontSize: 48 }}>🏆</div>
+             <div style={{ flex: 1 }}>
+                <div className="t-pixel" style={{ fontSize: 14, color: "var(--amber)", letterSpacing: 2, marginBottom: 8 }}>FINAL CHALLENGE</div>
+                <div className="t-body" style={{ fontSize: 13, color: "var(--white-70)" }}>
+                  {challengeStatus === "locked" 
+                    ? "Complete all lessons to unlock the final trial." 
+                    : challengeStatus === "complete"
+                    ? "Challenge conquered! You've mastered this zone."
+                    : "Ready to test your skills? Face the final challenge of Init Valley."}
+                </div>
+             </div>
+             <div style={{ textAlign: "right" }}>
+                <span className={"pixel-chip " + (challengeStatus === "complete" ? "green" : challengeStatus === "available" ? "amber-fill" : "dim")}>
+                  {challengeStatus === "complete" ? "CONQUERED" : challengeStatus === "available" ? "READY" : "LOCKED"}
+                </span>
+                <div style={{ marginTop: 12 }}>
+                   <PixelButton disabled={challengeStatus === "locked"} variant={challengeStatus === "complete" ? "secondary" : "primary"}>
+                      {challengeStatus === "complete" ? "REVIEW" : "ENTER →"}
+                   </PixelButton>
+                </div>
+             </div>
+          </div>
+        </div>
+
+        {isChallengeDone && (
+          <div style={{ marginTop: 64 }}>
             <div className="pixel-border-heavy" style={{
               background: "linear-gradient(90deg, rgba(45,90,39,0.3), rgba(245,158,11,0.12))",
               padding: 28, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 24,
             }}>
               <div>
                 <div className="t-pixel" style={{ fontSize: 14, color: "var(--amber)", letterSpacing: 2, marginBottom: 12,
-                  textShadow: "0 0 12px rgba(245,158,11,0.7)" }}>✓ ZONE COMPLETE!</div>
+                  textShadow: "0 0 12px rgba(245,158,11,0.7)" }}>✓ ZONE MASTERED!</div>
                 <div className="t-body" style={{ fontSize: 14, color: "var(--white-90)", lineHeight: 1.5 }}>
-                  You've mastered {meta.name}. Staging Plains is now unlocked!
+                  You've successfully completed all lessons and the challenge for {meta.name}.
                 </div>
               </div>
-              <PixelButton onClick={() => router.push('/world')} size="lg">→ CONTINUE</PixelButton>
+              <PixelButton onClick={() => router.push('/world')} size="lg">→ NEXT ZONE</PixelButton>
             </div>
           </div>
         )}
