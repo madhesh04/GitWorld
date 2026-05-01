@@ -71,9 +71,9 @@ export default function LoginPage() {
             <span style={{ color: "#fff", fontSize: 12 }}>git status --global</span>
           </div>
           <div className="t-pixel" style={{ fontSize: 6, color: "rgba(255,255,255,0.4)", letterSpacing: 1 }}>
-            > 10,000+ DEVELOPERS CONNECTED<br/>
-            > NO CREDIT CARD REQUIRED<br/>
-            > OPEN SOURCE LEARNING ENABLED
+            &gt; 10,000+ DEVELOPERS CONNECTED<br/>
+            &gt; NO CREDIT CARD REQUIRED<br/>
+            &gt; OPEN SOURCE LEARNING ENABLED
           </div>
         </div>
 
