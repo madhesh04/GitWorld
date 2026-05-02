@@ -17,10 +17,39 @@ export async function getOrCreateUser(uid: string, initialData: Partial<UserDocu
   const userRef = doc(db, 'users', uid)
   const snap = await getDoc(userRef)
   
+  const today = new Date().toDateString();
+  const yesterday = new Date(Date.now() - 86400000).toDateString();
+
   if (snap.exists()) {
-    return snap.data() as UserDocument
+    const data = snap.data() as UserDocument;
+    
+    // ── STREAK LOGIC ──
+    if (data.streakLastDate !== today) {
+      let newStreak = 1;
+      if (data.streakLastDate === yesterday) {
+        newStreak = (data.streakDays || 0) + 1;
+      }
+      
+      const updateData = {
+        streakDays: newStreak,
+        streakLastDate: today,
+        longestStreak: Math.max(data.longestStreak || 0, newStreak),
+        lastActiveAt: serverTimestamp()
+      };
+      
+      await updateDoc(userRef, updateData);
+      
+      return { 
+        ...data, 
+        streakDays: newStreak, 
+        streakLastDate: today, 
+        longestStreak: Math.max(data.longestStreak || 0, newStreak) 
+      } as UserDocument;
+    }
+    
+    return data;
   } else {
-    const newUser: UserDocument = {
+    const newUser: any = {
       uid,
       displayName: initialData.displayName || 'Octocat',
       email: initialData.email || '',
@@ -29,18 +58,18 @@ export async function getOrCreateUser(uid: string, initialData: Partial<UserDocu
       avatarIndex: 0,
       xp: 0,
       level: 1,
-      streakDays: 0,
-      streakLastDate: '',
-      longestStreak: 0,
+      streakDays: 1,
+      streakLastDate: today,
+      longestStreak: 1,
       completedLessons: [],
       completedZones: [],
       unlockedZones: ['init'],
       earnedBadges: [],
-      createdAt: serverTimestamp() as any,
-      lastActiveAt: serverTimestamp() as any,
+      createdAt: serverTimestamp(),
+      lastActiveAt: serverTimestamp(),
     }
     await setDoc(userRef, newUser)
-    return newUser
+    return newUser as UserDocument
   }
 }
 
