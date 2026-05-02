@@ -22,9 +22,32 @@ const nunito = Nunito({
 })
 
 export const metadata: Metadata = {
-  title: 'GitWorld — Learn Git. One commit at a time.',
-  description:
-    'A gamified, pixel-art RPG world for learning Git. Navigate zones, complete challenges, earn XP and badges.',
+  title: 'GitWorld — Learn Git. Level Up.',
+  description: 'GitWorld is a free, gamified Git learning platform. Master git commands through interactive RPG-style challenges. Learn git init, commit, branch, merge, rebase and more.',
+  keywords: ['git tutorial', 'learn git', 'git for beginners', 
+             'git commands', 'gitworld', 'interactive git learning'],
+  authors: [{ name: 'GitWorld' }],
+  openGraph: {
+    title: 'GitWorld — Learn Git. Level Up.',
+    description: 'Master Git through gamified RPG-style challenges.',
+    url: 'https://gitnexa.vercel.app',
+    siteName: 'GitWorld',
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'GitWorld — Learn Git. Level Up.',
+    description: 'Master Git through gamified RPG-style challenges.',
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: { index: true, follow: true },
+  },
+  metadataBase: new URL('https://gitnexa.vercel.app'),
+  verification: {
+    google: 'QCSVHjNjERMhCDSQWT7xplfJUJQo5Qa0nEN2nNkQ-6M',
+  },
 }
 
 import { Analytics } from "@vercel/analytics/next"
