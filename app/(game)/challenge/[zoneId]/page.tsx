@@ -84,9 +84,66 @@ function runGit(state: any, raw: string) {
       { c: "white-70", t: `    ${state.lastMsg || "feat: add hero"}` },
     ]};
   }
+  if (cmd === "git" && args[1] === "branch") {
+    const name = args[2];
+    if (!name) {
+      // List branches
+      const branches = state.branches || ["main"];
+      return { 
+        state, 
+        out: branches.map((b: string) => ({ 
+          c: b === state.branch ? "green" : "white-70", 
+          t: `${b === state.branch ? "* " : "  "}${b}` 
+        }))
+      };
+    }
+    const branches = state.branches || ["main"];
+    if (branches.includes(name)) return { state, out: [{ c: "red", t: `fatal: a branch named '${name}' already exists` }] };
+    return { 
+      state: { ...state, branches: [...branches, name] }, 
+      out: [{ c: "white-30", t: `(no output — branch '${name}' created)` }] 
+    };
+  }
+  if (cmd === "git" && (args[1] === "checkout" || args[1] === "switch")) {
+    const name = args[2];
+    if (!name) return { state, out: [{ c: "red", t: "fatal: branch name required" }] };
+    const branches = state.branches || ["main"];
+    if (!branches.includes(name)) return { state, out: [{ c: "red", t: `error: pathspec '${name}' did not match any file(s) known to git` }] };
+    return { 
+      state: { ...state, branch: name }, 
+      out: [{ c: "white-70", t: `Switched to branch '${name}'` }] 
+    };
+  }
+  if (cmd === "git" && args[1] === "merge") {
+    const name = args[2];
+    if (!name) return { state, out: [{ c: "red", t: "fatal: branch name required" }] };
+    const branches = state.branches || ["main"];
+    if (!branches.includes(name)) return { state, out: [{ c: "red", t: `merge: ${name} - not something we can merge` }] };
+    if (name === state.branch) return { state, out: [{ c: "white-70", t: "Already up to date." }] };
+    return { 
+      state, 
+      out: [
+        { c: "white-70", t: `Updating ${Math.random().toString(36).slice(2,9)}..${Math.random().toString(36).slice(2,9)}` },
+        { c: "white-70", t: "Fast-forward" },
+        { c: "white-50", t: " main.js | 2 +-" },
+        { c: "white-50", t: " 1 file changed, 1 insertion(+), 1 deletion(-)" },
+      ] 
+    };
+  }
+  if (cmd === "git" && args[1] === "rebase") {
+    const name = args[2];
+    if (!name) return { state, out: [{ c: "red", t: "fatal: branch name required" }] };
+    return { 
+      state, 
+      out: [
+        { c: "white-70", t: `First, rewinding head to replay your work on top of it...` },
+        { c: "white-70", t: `Applying: feat: add hero` },
+      ] 
+    };
+  }
   if (cmd === "git" && args[1] === "help") {
     return { state, out: [
-      { c: "amber", t: "Available: git status, git init, git clone, git add <file>, git commit -m \"msg\", git log, git reset" },
+      { c: "amber", t: "Available: git status, git init, git clone, git add <file>, git commit -m \"msg\", git log, git branch, git checkout, git switch, git merge, git rebase" },
     ]};
   }
   if (cmd === "clear") return { state, out: "__CLEAR__" };
@@ -114,13 +171,14 @@ export default function ChallengePage({ params }: { params: Promise<{ zoneId: st
 
   const [state, setState] = useState({
     files: challenge.files,
-    staged: [],
-    committed: [],
-    branch: "main",
+    staged: challenge.staged || [],
+    committed: challenge.committed || [],
+    branch: challenge.initialBranch || "main",
+    branches: challenge.initialBranches || ["main"],
     lastMsg: null,
     lastSha: null,
-    initialized: false,
-    cloned: false,
+    initialized: zoneId !== "init",
+    cloned: zoneId !== "init",
   });
 
   const [history, setHistory] = useState<any[]>([

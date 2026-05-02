@@ -67,10 +67,13 @@ export default function WorldMap() {
     return { ...z, done: doneCount, status };
   });
 
+  const allZonesComplete = dynamicZones.every(z => z.status === "complete");
+  const masterChallengeDone = user.completedLessons.includes("challenge-master");
+
   const SVG_W = 600;
   const ZONE_R = 64;
   const ZONE_SPACING = 220;
-  const SVG_H = ZONES.length * ZONE_SPACING + 80;
+  const SVG_H = (ZONES.length + (allZonesComplete ? 1 : 0)) * ZONE_SPACING + 120;
   const CX = SVG_W / 2;
   const zoneY = (i: number) => 80 + i * ZONE_SPACING;
 
@@ -88,8 +91,12 @@ export default function WorldMap() {
             <filter id="glowStrong" x="-60%" y="-60%" width="220%" height="220%">
               <feGaussianBlur stdDeviation="9" result="blur" /><feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
             </filter>
+            <filter id="goldGlow" x="-60%" y="-60%" width="220%" height="220%">
+              <feGaussianBlur stdDeviation="15" result="blur" /><feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
+            </filter>
           </defs>
 
+          {/* Paths between standard zones */}
           {dynamicZones.slice(0, -1).map((z, i) => {
             const next = dynamicZones[i + 1];
             const unlocked = next.status !== "locked";
@@ -104,6 +111,16 @@ export default function WorldMap() {
             );
           })}
 
+          {/* Path to Master Challenge */}
+          {allZonesComplete && (
+            <g key="path-master">
+              <line x1={CX} y1={zoneY(ZONES.length - 1)} x2={CX} y2={zoneY(ZONES.length)} stroke="rgba(0,0,0,0.5)" strokeWidth="8" />
+              <line x1={CX} y1={zoneY(ZONES.length - 1)} x2={CX} y2={zoneY(ZONES.length)} stroke="#f59e0b" strokeWidth="4" />
+              <line className="animate-path-flow" x1={CX} y1={zoneY(ZONES.length - 1)} x2={CX} y2={zoneY(ZONES.length)} stroke="#f59e0b" strokeWidth="2" strokeDasharray="4 16" filter="url(#glow)" />
+            </g>
+          )}
+
+          {/* Standard Zone Nodes */}
           {dynamicZones.map((z, i) => {
             const locked = z.status === "locked";
             const active = z.status === "active";
@@ -137,6 +154,26 @@ export default function WorldMap() {
               </g>
             );
           })}
+
+          {/* Master Challenge Node */}
+          {allZonesComplete && (
+            <g
+              style={{ cursor: "pointer", transition: "opacity 300ms", transformOrigin: `${CX}px ${zoneY(ZONES.length)}px` }}
+              onMouseEnter={() => setHovered("master")}
+              onMouseLeave={() => setHovered(null)}
+              onClick={() => router.push(`/challenge/master`)}
+              className="animate-node-breath"
+            >
+              <circle cx={CX} cy={zoneY(ZONES.length)} r={ZONE_R + 15} fill="none" stroke="#f59e0b" strokeWidth="3" opacity="0.4" filter="url(#goldGlow)" />
+              <circle cx={CX} cy={zoneY(ZONES.length)} r={ZONE_R} fill="#1a0d0d" stroke="#f59e0b" strokeWidth={hovered === "master" ? 6 : 4} filter="url(#goldGlow)" />
+              <text x={CX} y={zoneY(ZONES.length) + 12} textAnchor="middle" style={{ fontSize: 42 }}>👑</text>
+              <text x={CX} y={zoneY(ZONES.length) + ZONE_R + 22} textAnchor="middle" fill="#f59e0b" style={{ fontFamily: "var(--font-pixel)", fontSize: 10, letterSpacing: 3, fontWeight: "bold" }}>MASTER TRIAL</text>
+              <text x={CX} y={zoneY(ZONES.length) + ZONE_R + 38} textAnchor="middle" fill="rgba(255,255,255,0.6)" style={{ fontFamily: "var(--font-pixel)", fontSize: 7, letterSpacing: 1 }}>THE FINAL TEST</text>
+              {masterChallengeDone && (
+                <g><circle cx={CX + ZONE_R - 8} cy={zoneY(ZONES.length) - ZONE_R + 8} r={13} fill="#16a34a" stroke="#060a15" strokeWidth="2.5" /><text x={CX + ZONE_R - 8} y={zoneY(ZONES.length) - ZONE_R + 13} textAnchor="middle" fill="#ffffff" style={{ fontFamily: "var(--font-pixel)", fontSize: 10 }}>✓</text></g>
+              )}
+            </g>
+          )}
         </svg>
       </div>
 

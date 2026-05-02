@@ -157,6 +157,15 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
       setFirestoreReady(true);
     });
   }, []);
+  // ── Toast helpers ──
+  const addToast = useCallback((item: ToastItem) => {
+    setToasts(prev => [...prev, item]);
+  }, []);
+
+  const removeToast = useCallback((id: string) => {
+    setToasts(prev => prev.filter(t => t.id !== id));
+  }, []);
+
 
   // ── Derived user state ──
   const levelInfo    = getLevelInfo(totalXp);
@@ -182,14 +191,64 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
     avatarUrl,
   };
 
-  // ── Toast helpers ──
-  const addToast = useCallback((item: ToastItem) => {
-    setToasts(prev => [...prev, item]);
-  }, []);
+  // ── Achievement Engine ──
+  useEffect(() => {
+    if (!firestoreReady || !fbUser) return;
+    
+    const newBadges: string[] = [];
+    
+    // 1. FIRST COMMIT
+    if (completedLessons.includes("git-commit") && !earnedBadges.includes("FIRST COMMIT")) {
+      newBadges.push("FIRST COMMIT");
+    }
+    
+    // 2. VALLEY CONQUEROR (Zone 1)
+    const initLessons = ["install-git", "what-is-git", "git-init", "git-clone", "github-setup"];
+    const isInitMastered = initLessons.every(id => completedLessons.includes(id)) && completedLessons.includes("challenge-init");
+    if (isInitMastered && !earnedBadges.includes("VALLEY CONQUEROR")) {
+      newBadges.push("VALLEY CONQUEROR");
+    }
+    
+    // 3. GIT GURU (Level 10 or 100% Completion)
+    if ((user.xp >= 4500 || completedLessons.length >= 31) && !earnedBadges.includes("GIT GURU")) {
+      newBadges.push("GIT GURU");
+    }
+    
+    // 4. ON FIRE (Streak 2+)
+    if (user.streak >= 2 && !earnedBadges.includes("ON FIRE")) {
+      newBadges.push("ON FIRE");
+    }
 
-  const removeToast = useCallback((id: string) => {
-    setToasts(prev => prev.filter(t => t.id !== id));
-  }, []);
+    // 5. UNSTOPPABLE (Streak 3+)
+    if (user.streak >= 3 && !earnedBadges.includes("UNSTOPPABLE")) {
+      newBadges.push("UNSTOPPABLE");
+    }
+
+    // 6. PURE INSTINCT (Master Trial Complete)
+    if (completedLessons.includes("challenge-master") && !earnedBadges.includes("PURE INSTINCT")) {
+      newBadges.push("PURE INSTINCT");
+    }
+
+    if (newBadges.length > 0) {
+      const next = [...earnedBadges, ...newBadges];
+      setEarnedBadges(next);
+      saveEarnedBadges(next);
+      updateUser(fbUser.uid, { earnedBadges: next });
+      
+      // Toast notifications
+      newBadges.forEach((b, i) => {
+        setTimeout(() => {
+          addToast({
+            id: `auto-badge-${Date.now()}-${i}`,
+            kind: "badge",
+            props: { icon: "🎯", name: b, desc: "Achievement unlocked!", xp: 150 }
+          });
+        }, 1000 * (i + 1));
+      });
+    }
+  }, [completedLessons, user.level, user.streak, earnedBadges, fbUser, firestoreReady, addToast]);
+
+
 
   // ── Core lesson completion function ──
   const completeLesson = useCallback((lessonId: string, zoneId: string) => {
@@ -217,7 +276,7 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
       badgeName,
       badgeIcon = "🎯",
       badgeDesc = "",
-      badgeXp   = 75,
+      badgeXp   = 150,
     } = opts;
 
     // Calculate multipliers

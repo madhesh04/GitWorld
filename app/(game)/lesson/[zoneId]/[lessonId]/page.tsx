@@ -6,6 +6,8 @@ import { TopNav } from '@/components/ui/TopNav';
 import { LESSON_CONTENT, ZONE_LESSONS } from '@/lib/constants';
 import { PixelButton } from '@/components/ui/PixelButton';
 
+import { DiagramBranching, DiagramMerging, DiagramRebasing } from '@/components/lesson/Diagrams';
+
 /* ── Inline text parser: **bold** and `code` and *italic* ── */
 function richText(t: string) {
   const parts: React.ReactNode[] = [];
@@ -132,13 +134,26 @@ export default function LessonPage({ params }: { params: Promise<{ zoneId: strin
   const handleScroll = () => {
     const el = scrollRef.current;
     if (!el) return;
-    const max = el.scrollHeight - el.clientHeight;
-    setScrollPct(max > 0 ? Math.min(100, (el.scrollTop / max) * 100) : 100);
+    // Use a small buffer (10px) to account for subpixel differences
+    const max = el.scrollHeight - el.clientHeight - 10;
+    const current = el.scrollTop;
+    
+    if (max <= 0) {
+      setScrollPct(100);
+    } else {
+      setScrollPct(Math.min(100, (current / max) * 100));
+    }
   };
 
-  useEffect(() => { handleScroll(); }, []);
+  useEffect(() => { 
+    // Initial check in case content is short
+    handleScroll(); 
+    // Also check on resize
+    window.addEventListener('resize', handleScroll);
+    return () => window.removeEventListener('resize', handleScroll);
+  }, []);
 
-  const unlocked = scrollPct > 92 || user.completedLessons.includes(lessonId);
+  const unlocked = scrollPct > 85 || user.completedLessons.includes(lessonId);
 
   const onFinish = () => {
     completeLesson(lessonId, zoneId);
@@ -150,7 +165,7 @@ export default function LessonPage({ params }: { params: Promise<{ zoneId: strin
   };
 
   return (
-    <div style={{ height: "100vh", display: "flex", flexDirection: "column", background: "#0a0e1a" }}>
+    <div style={{ height: "100vh", display: "flex", flexDirection: "column", background: "#0a0e1a", overflow: "hidden" }}>
       <TopNav />
 
       {/* Breadcrumb */}
@@ -163,6 +178,7 @@ export default function LessonPage({ params }: { params: Promise<{ zoneId: strin
         display: "flex",
         alignItems: "center",
         padding: "0 28px",
+        zIndex: 60,
       }}>
         {lesson.breadcrumb.map((crumb: string, i: number) => (
           <React.Fragment key={i}>
@@ -195,9 +211,13 @@ export default function LessonPage({ params }: { params: Promise<{ zoneId: strin
       <div
         ref={scrollRef}
         onScroll={handleScroll}
-        style={{ flex: 1, overflowY: "auto", paddingBottom: 100 }}
+        style={{ 
+          flex: 1, 
+          overflowY: "auto", 
+          background: "linear-gradient(to bottom, #0a0e1a, #070a14)",
+        }}
       >
-        <div style={{ maxWidth: 700, margin: "0 auto", padding: "32px 28px 24px" }}>
+        <div style={{ maxWidth: 700, margin: "0 auto", padding: "32px 28px 80px" }}>
           <div style={{
             display: "inline-flex",
             alignItems: "center",
@@ -208,7 +228,7 @@ export default function LessonPage({ params }: { params: Promise<{ zoneId: strin
             color: "#f59e0b",
             padding: "5px 10px",
             background: "rgba(245,158,11,0.12)",
-            boxShadow: "-2px 0 0 0 #f59e0b, 2px 0 0 0 #f59e0b, 0 -2px 0 0 #f59e0b, 0 2px 0 0 #f59e0b",
+            boxShadow: "-2px 0 0 0 #f59e0b, 2px 0 0 0 #f59e0b, 0 -2px 0 0 #f59e0b, 0 6px 0 0 #f59e0b",
             marginBottom: 16,
           }}>
             ✦ {lesson.zoneLabel.replace(/^.*? /, '')}
@@ -237,12 +257,26 @@ export default function LessonPage({ params }: { params: Promise<{ zoneId: strin
             if (b.type === "callout") return <div key={i} style={{ background: "rgba(245,158,11,0.06)", borderLeft: "3px solid #f59e0b", padding: "13px 16px", margin: "20px 0" }}><div style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "rgba(255,255,255,0.85)", lineHeight: 1.65 }}>💡 {b.text}</div></div>;
             if (b.type === "code") return <div key={i} style={{ margin: "22px 0" }}><div style={{ background: "#0a0f1e", borderBottom: "1px solid rgba(245,158,11,0.15)", padding: "7px 12px", display: "flex", alignItems: "center", justifyContent: "space-between", boxShadow: "-2px 0 0 0 rgba(245,158,11,0.35), 2px 0 0 0 rgba(245,158,11,0.35), 0 -2px 0 0 rgba(245,158,11,0.35), 0 2px 0 0 rgba(245,158,11,0.35)" }}><span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "rgba(255,255,255,0.4)" }}>· · · TERMINAL</span></div><pre style={{ margin: 0, padding: "14px 16px", fontFamily: "var(--font-mono)", fontSize: 13, lineHeight: 1.7, background: "#0d1117", overflowX: "auto", boxShadow: "-2px 0 0 0 rgba(245,158,11,0.35), 2px 0 0 0 rgba(245,158,11,0.35), 0 -2px 0 0 rgba(245,158,11,0.35), 0 2px 0 0 rgba(245,158,11,0.35)" }}>{b.lines.map((l: any, j: number) => <span key={j} style={{ color: l.kind === "prompt" ? "#f59e0b" : l.kind === "cmd" ? "#00ff41" : "rgba(255,255,255,0.65)", display: l.kind === "prompt" ? "inline" : "block" }}>{l.text}</span>)}</pre></div>;
             if (b.type === "diagram") return <DiagramHowCommit key={i} />;
+            if (b.type === "diagram-branch") return <DiagramBranching key={i} />;
+            if (b.type === "diagram-merge") return <DiagramMerging key={i} />;
+            if (b.type === "diagram-rebase") return <DiagramRebasing key={i} />;
+            if (b.type === "image") return <div key={i} style={{ margin: "24px 0", border: "2px solid #f59e0b", padding: 4, background: "#0d1117" }}><img src={b.url} alt="Lesson illustration" style={{ width: "100%", display: "block" }} /></div>;
             if (b.type === "compare") return <GoodBadCompare key={i} />;
             return null;
           })}
 
-          {/* New Progression Button */}
-          <div style={{ marginTop: 60, textAlign: "center", paddingTop: 40, borderTop: "1px solid rgba(255,255,255,0.1)" }}>
+          {/* Progression Area with Stable Height */}
+          <div style={{ 
+            marginTop: 60, 
+            textAlign: "center", 
+            paddingTop: 40, 
+            borderTop: "1px solid rgba(255,255,255,0.1)",
+            minHeight: 240, // STABILIZE HEIGHT
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center"
+          }}>
              {unlocked ? (
                 <div className="fade-in">
                    <div className="t-pixel" style={{ fontSize: 10, color: "var(--amber)", letterSpacing: 2, marginBottom: 20 }}>LESSON COMPLETE!</div>
@@ -259,11 +293,17 @@ export default function LessonPage({ params }: { params: Promise<{ zoneId: strin
         </div>
       </div>
 
-      {/* Bottom Bar */}
+      {/* Bottom Bar - No longer fixed, just a flex item */}
       <div style={{
-        position: "fixed", bottom: 0, left: 0, right: 0,
-        height: 72, background: "#0d1424", boxShadow: "0 -3px 0 0 #f59e0b",
-        display: "flex", alignItems: "center", padding: "0 28px", zIndex: 50, gap: 24,
+        height: 72, 
+        flexShrink: 0,
+        background: "#0d1424", 
+        borderTop: "3px solid #f59e0b",
+        display: "flex", 
+        alignItems: "center", 
+        padding: "0 28px", 
+        zIndex: 100, 
+        gap: 24,
       }}>
         <div style={{ flex: 1, maxWidth: 360 }}>
           <div style={{ fontFamily: "var(--font-pixel)", fontSize: 7, color: unlocked ? "#f59e0b" : "rgba(255,255,255,0.35)", letterSpacing: 1.5, marginBottom: 8 }}>

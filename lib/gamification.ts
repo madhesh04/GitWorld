@@ -15,12 +15,12 @@ export const LEVELS: LevelInfo[] = [
   { level: 2, title: "CODE SQUIRE",     xpRequired: 200,  xpForNext: 500,  zoneUnlock: "🌿 STAGING PLAINS" },
   { level: 3, title: "COMMIT FORGER",   xpRequired: 500,  xpForNext: 900,  zoneUnlock: "🔥 COMMIT FORGE" },
   { level: 4, title: "BRANCH RANGER",   xpRequired: 900,  xpForNext: 1400, zoneUnlock: "🌳 BRANCH FOREST" },
-  { level: 5, title: "MERGE MASTER",    xpRequired: 1400, xpForNext: 2000, zoneUnlock: "⚔️ MERGE BATTLEGROUNDS" },
-  { level: 6, title: "REBASE SAGE",     xpRequired: 2000, xpForNext: 2700, zoneUnlock: "🌀 REBASE TEMPLE" },
-  { level: 7, title: "GIT VETERAN",     xpRequired: 2700, xpForNext: 3500, zoneUnlock: undefined },
-  { level: 8, title: "COMMIT LEGEND",   xpRequired: 3500, xpForNext: 4400, zoneUnlock: undefined },
-  { level: 9, title: "FORK OVERLORD",   xpRequired: 4400, xpForNext: 5400, zoneUnlock: undefined },
-  { level: 10, title: "GIT DEITY",      xpRequired: 5400, xpForNext: 9999, zoneUnlock: undefined },
+  { level: 5, title: "MERGE MASTER",    xpRequired: 1400, xpForNext: 1900, zoneUnlock: "⚔️ MERGE BATTLEGROUNDS" },
+  { level: 6, title: "REBASE SAGE",     xpRequired: 1900, xpForNext: 2500, zoneUnlock: "🌀 REBASE TEMPLE" },
+  { level: 7, title: "GIT VETERAN",     xpRequired: 2500, xpForNext: 3100, zoneUnlock: undefined },
+  { level: 8, title: "COMMIT LEGEND",   xpRequired: 3100, xpForNext: 3800, zoneUnlock: undefined },
+  { level: 9, title: "FORK OVERLORD",   xpRequired: 3800, xpForNext: 4500, zoneUnlock: undefined },
+  { level: 10, title: "GIT DEITY",      xpRequired: 4500, xpForNext: 9999, zoneUnlock: undefined },
 ];
 
 /** Returns the LevelInfo for a given total XP. */
