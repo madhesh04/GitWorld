@@ -27,6 +27,8 @@ export const metadata: Metadata = {
     'A gamified, pixel-art RPG world for learning Git. Navigate zones, complete challenges, earn XP and badges.',
 }
 
+import { Analytics } from "@vercel/analytics/next"
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -42,6 +44,7 @@ export default function RootLayout({
         <GameStateProvider>
           {children}
         </GameStateProvider>
+        <Analytics />
       </body>
     </html>
   )
